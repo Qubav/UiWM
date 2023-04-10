@@ -3,6 +3,8 @@ from matplotlib import pyplot as plt
 import scipy
 from scipy import interpolate as interp
 import cv2 as cv
+from Lab3 import two_dim_increasing
+import time
 
 def two_dim_decreasing(img, scale, show = False):
     img_org = img.copy()
@@ -42,7 +44,7 @@ def two_dim_decreasing(img, scale, show = False):
 
     return blank
 
-def two_dim_increasing(img, scale, show = False):
+def two_dim_increasing_BSpline(img, scale, show = False):
     img_org = img.copy()
 
     if not(isinstance(scale, int)):
@@ -69,11 +71,11 @@ def two_dim_increasing(img, scale, show = False):
     x_intp = []
 
     # dodanie odpowiednich wartości do vektora wykorzystanego później w interpolacji
-    for i in range(scale * (input_width + 1)):
+    for i in range(scale * input_width):
             x_intp.append(i)
 
     # stworzenie wektora wykorzystanego w ramach interpolacji do wskazania położenia x dla wartości y_r...
-    for i in range(input_width + 1):
+    for i in range(input_width):
         x.append(scale * i)
 
     for i in range(input_height):
@@ -152,21 +154,21 @@ def two_dim_increasing(img, scale, show = False):
     x.clear()
     x_intp.clear()
 
+    if(show is True):
+        print("Rozmiar oryginalnego obrazu wynosi", img_org.shape, ", a rozmiar zmniejszonego obrazu wynosi", blank.shape)
+        cv.imshow("Oryginalny obraz", img_org)
+        cv.imshow("Zmniejszony obraz", blank)
+        cv.waitKey(0)
+    
     return blank, increased_img
 
-if __name__ == "__main__":
-    img_org = cv.imread("kwiaty.jpg")
+def image_poisson_distribution(img_org, lamb):
     img = img_org.copy()
     input_height = img.shape[0]
     input_width = img.shape[1]
     blank = np.zeros((input_height, input_width, 3), np.float64)
-    print(blank.shape)
     pois_number = input_width * input_height
-    poisson = np.random.poisson(1024.0, pois_number)
-
-    # plt.figure()
-    # plt.hist(poisson)
-    # plt.show()
+    poisson = np.random.poisson(lamb, pois_number)
 
     for i in range(input_height):
         for j in range(input_width):
@@ -174,13 +176,50 @@ if __name__ == "__main__":
             blank[i, j, 1] = img[i, j, 1] + poisson[i * input_height + j]
             blank[i, j, 2] = img[i, j, 2] + poisson[i * input_height + j]
 
-    output = cv.normalize(blank, dst=None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
-    
+    return cv.normalize(blank, dst=None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
 
-    maly = two_dim_decreasing(output, 10)
-    _, outpu2 = two_dim_increasing(maly, 10)
-    cv.imshow("kwiaty szum", output)
-    cv.imshow("kwiaty", img)
-    cv.imshow("zmniejszony", maly)
-    cv.imshow("powiekszony",outpu2)
-    cv.waitKey(0)
+def mse(img_org_, img_interp_):
+    img_org = img_org_.copy()
+    img_interp = img_interp_.copy()
+    sum = 0
+    for i in range(img_interp.shape[0]):
+        for j in range(img_interp.shape[1]):
+            for c in range(3):
+                sum +=  (img_org[i, j, c] - img_interp[i, j, c]) ** 2
+    sum = sum / (img_interp.shape[0] * img_interp.shape[1])
+
+    return sum
+
+def mae(img_org_, img_interp_):
+    img_org = img_org_.copy()
+    img_interp = img_interp_.copy()
+    sum = 0
+    for i in range(img_interp.shape[0]):
+        for j in range(img_interp.shape[1]):
+            for c in range(3):
+                sum += abs(img_org[i, j, c] - img_interp[i, j, c])
+
+    sum = sum / (img_interp.shape[0] * img_interp.shape[1])
+
+    return sum
+
+
+if __name__ == "__main__":
+    img_org = cv.imread("kwiaty.jpg")
+    lamb = [1, 4, 16, 64, 256, 1024]
+    scale = 10
+
+    for i in range(len(lamb)):
+        time_start = time.time()
+        img_poiss = image_poisson_distribution(img_org, lamb[i])
+        img_dec = two_dim_decreasing(img_poiss, scale)
+        _, img_inc = two_dim_increasing(img_dec, scale, True)
+        mae_val = mae(img_poiss, img_inc)
+        mse_val = mse(img_poiss, img_inc)
+        time_end = time.time()
+        print(" Czas trwania operacji dla obrazów przy lambda" + f"{lamb[i]}" + "wynosi", time_end - time_start, ".\n")
+        cv.imwrite("img_dec_" + f"{lamb[i]}" + ".png", img_dec)
+        cv.imwrite("img_inc_" + f"{lamb[i]}" + ".png", img_inc)
+        cv.imwrite("img_poiss_" + f"{lamb[i]}" + ".png", img_poiss)
+        print("Dla lambda =" + f"{lamb[i]}" + "wartość MAE wynosi: " + f"{mae_val}" + ", a wartość MSE wynosi: " + f"{mse_val}" + ".\n")
+    print("Koniec!\n")
