@@ -1,11 +1,6 @@
 import numpy as np
-from matplotlib import pyplot as plt
-import scipy
-from scipy import interpolate as interp
 import cv2 as cv
-from uczenie_maszynowe_08_03 import kernel_h1 as k1, kernel_h2 as k2, kernel_h3 as k3, kernel_h4 as k4, kernel_h5 as k5
-import time
-
+from Lab2 import kernel_h1 as k1, kernel_h2 as k2, kernel_h3 as k3, kernel_h4 as k4, kernel_h5 as k5
 
 def normalize(x):
     if(x > 255):

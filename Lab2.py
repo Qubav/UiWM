@@ -1,6 +1,5 @@
 import numpy as np
 from matplotlib import pyplot as plt
-import scipy
 from scipy import interpolate as interp
 
 def kernel_h1(t):
@@ -127,7 +126,6 @@ def conv_interp(s_n = 10, i_s_n = 30, kernel = 5, sin_x = False, sin_x_power_min
     kernel_grid = np.tile(xvals, (len(x), 1))
     offset = np.tile(np.expand_dims(x, axis= -1), (1, len(xvals)))
     kernel_grid = (kernel_grid - offset) / period
-    x_krenel =kernel_grid.copy()
 
     for i in range(kernel_grid.shape[0]):
         for j in range(kernel_grid.shape[1]):
@@ -143,13 +141,9 @@ def conv_interp(s_n = 10, i_s_n = 30, kernel = 5, sin_x = False, sin_x_power_min
                 kernel_grid[i, j] = kernel_h5(kernel_grid[i, j])
             else:
                 print("Wprowadzono niepoprawną wartość zmiennej kernel!\n")
-    # print(kernel_grid.shape)
-    # plt.figure(3)
-    # plt.plot(x_krenel[:, :], kernel_grid[:,:])
-    # plt.show()
+                
     yvals = np.dot(y, kernel_grid)
     
-
     # wyliczenie błędu średniokwadratowego
     L = 0
     if(sin_x is True):

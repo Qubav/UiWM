@@ -3,8 +3,8 @@ from matplotlib import pyplot as plt
 import scipy
 from scipy import interpolate as interp
 import cv2 as cv
-from uczenie_maszynowe_08_03 import kernel_h1 as k1, kernel_h2 as k2, kernel_h3 as k3, kernel_h4 as k4, kernel_h5 as k5
-import time
+from Lab2 import kernel_h1 as k1, kernel_h2 as k2, kernel_h3 as k3, kernel_h4 as k4, kernel_h5 as k5
+
 
 
 if __name__ == "__main__":
@@ -40,8 +40,6 @@ if __name__ == "__main__":
     # tile.astype(np.uint8)
     # print(tile)
     green = img[:,:,1]
-    # green.astype(np.uint8)
-    # green =  np.zeros((input_height, input_width, 3), dtype=np.uint8)
 
     green = green * tile
     cv.imshow("gren", green)
