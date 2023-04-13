@@ -1,0 +1,6 @@
+Dla parametru lambda: 1 wartoœæ MSE wynosi: 38692.748735101886, a wartoœæ MAE wynosi: 287.89493079584776.
+Dla parametru lambda: 4 wartoœæ MSE wynosi: 16358.274964436756, a wartoœæ MAE wynosi: 169.06083141099577.
+Dla parametru lambda: 16 wartoœæ MSE wynosi: 7596.989918300654, a wartoœæ MAE wynosi: 104.78573337178008.
+Dla parametru lambda: 64 wartoœæ MSE wynosi: 4819.214943291042, a wartoœæ MAE wynosi: 71.97473567858516.
+Dla parametru lambda: 256 wartoœæ MSE wynosi: 4175.786828143022, a wartoœæ MAE wynosi: 57.6068031526336.
+Dla parametru lambda: 1024 wartoœæ MSE wynosi: 3918.5958371780084, a wartoœæ MAE wynosi: 51.28374759707805.

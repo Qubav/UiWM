@@ -1,6 +1,4 @@
 import numpy as np
-from matplotlib import pyplot as plt
-import scipy
 from scipy import interpolate as interp
 import cv2 as cv
 from Lab3 import two_dim_increasing
@@ -162,21 +160,15 @@ def two_dim_increasing_BSpline(img, scale, show = False):
     
     return blank, increased_img
 
-def image_poisson_distribution(img_org, lamb):
-    img = img_org.copy()
-    input_height = img.shape[0]
-    input_width = img.shape[1]
-    blank = np.zeros((input_height, input_width, 3), np.float64)
-    pois_number = input_width * input_height
-    poisson = np.random.poisson(lamb, pois_number)
-
-    for i in range(input_height):
-        for j in range(input_width):
-            blank[i, j, 0] = img[i, j, 0] + poisson[i * input_height + j]
-            blank[i, j, 1] = img[i, j, 1] + poisson[i * input_height + j]
-            blank[i, j, 2] = img[i, j, 2] + poisson[i * input_height + j]
-
-    return cv.normalize(blank, dst=None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
+def poissoning(image: np.array, lambda_value: float) -> np.ndarray:
+    """
+    :param image: numpy array of shape (H, W, C) or (H, W)
+    :param lambda_value: number of simulated photons per pixel (or per channel, depending on the image)
+    :return:
+    """
+    noised_image = np.random.poisson(image / image.max() * lambda_value) / lambda_value
+    noised_image = np.clip(noised_image * 255, 0, 255).astype(np.uint8)
+    return noised_image
 
 def mse(img_org_, img_interp_):
     img_org = img_org_.copy()
@@ -185,7 +177,7 @@ def mse(img_org_, img_interp_):
     for i in range(img_interp.shape[0]):
         for j in range(img_interp.shape[1]):
             for c in range(3):
-                sum +=  (img_org[i, j, c] - img_interp[i, j, c]) ** 2
+                sum +=  (int(img_org[i, j, c]) - int(img_interp[i, j, c])) ** 2
     sum = sum / (img_interp.shape[0] * img_interp.shape[1])
 
     return sum
@@ -197,29 +189,41 @@ def mae(img_org_, img_interp_):
     for i in range(img_interp.shape[0]):
         for j in range(img_interp.shape[1]):
             for c in range(3):
-                sum += abs(img_org[i, j, c] - img_interp[i, j, c])
+                sum += abs(int(img_org[i, j, c]) - int(img_interp[i, j, c]))
 
     sum = sum / (img_interp.shape[0] * img_interp.shape[1])
 
     return sum
 
-
 if __name__ == "__main__":
     img_org = cv.imread("kwiaty.jpg")
     lamb = [1, 4, 16, 64, 256, 1024]
     scale = 10
+    # ker = 3
+    ker = "BSpline"
+    mse_values = []
+    mae_values = []
 
     for i in range(len(lamb)):
         time_start = time.time()
-        img_poiss = image_poisson_distribution(img_org, lamb[i])
+        img_poiss = poissoning(img_org, lamb[i])
         img_dec = two_dim_decreasing(img_poiss, scale)
-        _, img_inc = two_dim_increasing(img_dec, scale, True)
+        # _, img_inc = two_dim_increasing(img_dec, scale, True, kernel= ker)
+        _, img_inc = two_dim_increasing_BSpline(img_dec, 10, show=True)
         mae_val = mae(img_poiss, img_inc)
+        mae_values.append(mae_val)
         mse_val = mse(img_poiss, img_inc)
+        mse_values.append(mse_val)
         time_end = time.time()
         print(" Czas trwania operacji dla obrazów przy lambda" + f"{lamb[i]}" + "wynosi", time_end - time_start, ".\n")
-        cv.imwrite("img_dec_" + f"{lamb[i]}" + ".png", img_dec)
-        cv.imwrite("img_inc_" + f"{lamb[i]}" + ".png", img_inc)
-        cv.imwrite("img_poiss_" + f"{lamb[i]}" + ".png", img_poiss)
-        print("Dla lambda =" + f"{lamb[i]}" + "wartość MAE wynosi: " + f"{mae_val}" + ", a wartość MSE wynosi: " + f"{mse_val}" + ".\n")
+        # cv.imwrite("img_dec_" + f"lambda_{lamb[i]}_kernel_{ker}" + ".png", img_dec)
+        # cv.imwrite("img_inc_" + f"lambda_{lamb[i]}_kernel_{ker}" + ".png", img_inc)
+        # cv.imwrite("img_poiss_" + f"lambda_{lamb[i]}_kernel_{ker}" + ".png", img_poiss)
+        print("Dla lambda =" + f"lambda_{lamb[i]}" + "wartość MAE wynosi: " + f"{mae_val}" + ", a wartość MSE wynosi: " + f"{mse_val}" + ".\n")
+    
+    with open("Wartosci_" + f"lambda_{lamb[i]}_kernel_{ker}" + ".txt", "w") as f:
+            for i in range(len(lamb)):
+                f.write("Dla parametru lambda: " + f"{lamb[i]}" + " wartość MSE wynosi: " + f"{mse_values[i]}" + ", a wartość MAE wynosi: " + f"{mae_values[i]}" + ".\n")
+
     print("Koniec!\n")
+
