@@ -285,8 +285,8 @@ if __name__ == "__main__":
     mse_values = []
 
     # wybór 
-    Bayer_part = False
-    Fuji_part = True
+    Bayer_part = True
+    Fuji_part = False
 
     if(Bayer_part is True):
         for i in range(len(kernel_list)):
@@ -302,10 +302,6 @@ if __name__ == "__main__":
 
     if(Fuji_part is True):
         img_cmos = cmos(img, Bayer = False, Fuji = True, save = True, filename = "kot_Fuji_228x228")
-        
+
     cv.imshow("cmos_img", img_cmos)
     cv.waitKey(0)
-
-
-
-
