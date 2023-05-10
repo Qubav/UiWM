@@ -7,24 +7,47 @@ import pywt
 
 def fft_with_keeping(c_img: np.ndarray, keep) -> np.ndarray:
     Bt = np.fft.fft2(c_img)
-    # plt.figure()
-    # plt.imshow(np.clip(Bt, 0, 255).astype(np.uint8), cmap="gray")
-    # plt.show()
     Btsort = np.sort(np.abs(Bt.reshape(-1)))
-    thresh = Btsort[int(np.floor((1-keep) * len(Btsort)))]
+    # thresh = Btsort[int(np.floor((1-keep) * len(Btsort)))]
+    mean = np.mean(Btsort) * 1.1
+    thresh = mean
+
+    # plt.figure()
+    # plt.plot(Btsort)
+    # plt.show()
+    # thresh = np.max(Btsort)
     ind = np.abs(Bt) > thresh
     Atlow = Bt * ind
     Alow = np.fft.ifft2(Atlow).real
     Alow = np.clip(Alow, 0, 255).astype(np.uint8)
+    Bt = Bt.real
+    Bt = np.clip(Bt, 0, 255).astype(np.uint8)
 
-    return Alow
+    return Alow, Bt
+
+def mae(img_Xo: np.ndarray, img_Xd: np.ndarray) -> float:
+
+    n = img_Xd.shape[0] * img_Xd.shape[1] * 3
+    suma = 0
+
+    for c in range(3):
+        for i in range(img_Xd.shape[0]):
+            for j in range(img_Xd.shape[1]):
+                suma += np.abs(img_Xo[i, j, c] - img_Xd[i, j, c])
+    
+    max_Xo = img_Xo.max()
+    
+    return suma / (n * max_Xo)
+
 
 
 if __name__ == "__main__":
     plt.rcParams["figure.figsize"] = [5, 5]
     plt.rcParams.update({"font.size": 18})
 
-    A =  imread(os.path.join("panda.jpg"))
+    # A =  imread(os.path.join("panda.jpg"))
+    A =  imread(os.path.join("circle.jpg"))
+    # A =  imread(os.path.join("mond.jpg"))
     A_r = A[:, :, 0]
     A_g = A[:, :, 1]
     A_b = A[:, :, 2]
@@ -38,6 +61,7 @@ if __name__ == "__main__":
     if Fourier is True:
 
         images_decompressed = []
+        images_compressed = []
 
         plt.figure()
         plt.subplot(3, 1, 1)
@@ -51,16 +75,23 @@ if __name__ == "__main__":
 
         for keep in (0.1, 0.05, 0.01, 0.002):
             A_new  = []
+            Bt_new = []
             for component in A_components:
-                Alow = fft_with_keeping(component, keep)
+                Alow, Bt = fft_with_keeping(component, keep)
                 A_new.append(Alow)
+                Bt_new.append(Bt)
 
             A_new_2 = np.dstack(A_new)
+            Bt_new_2 = np.dstack(Bt_new)
             images_decompressed.append(A_new_2)
+            images_compressed.append(Bt_new_2)
         
         for Alow in images_decompressed:
             plt.figure()
+            plt.subplot(2,1, 1)
             plt.imshow(Alow, cmap="gray")
+            plt.subplot(2, 1, 2)
+            plt.imshow(Bt, cmap="gray")
             plt.axis("off")
             
         plt.show()
