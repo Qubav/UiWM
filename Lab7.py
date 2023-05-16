@@ -5,6 +5,16 @@ import os
 import pywt
 
 
+KEEP_TOP_VAL = 0.1
+KEEP_BOTTOM_VAL = 0.5
+
+# zmienne globalne dla keep factor size
+MIN_VAL = 159600
+MAX_VAL = 490000
+MIN_TRANSFORMED = 0.8
+MAX_TRANSFORMED = 1
+
+
 class Photo:
     """FFT różne sposoby na wybór thresh i wartość zmiennej fft_thresh_type dla nich:
     1 - średnia wartość wartości bezwzględnych amplitud,
@@ -58,7 +68,7 @@ class Photo:
         plt.axis("off")
         plt.show()
 
-    def show_wavelet_decompressed_img(self):
+    def show_wavelet_decompressed_img(self) -> None:
         """Metoda wyświetla zdjęcie po kompresji i późniejszej dekompresji."""
 
         plt.figure()
@@ -85,7 +95,18 @@ class Photo:
         plt.axis("off")
         plt.show()
 
+    def keep_factor_size(self):
+        """Metoda zwraca wartość od 0.8 do 1 w zależności od rozmiarów zdjęcia. 0.8 przy liczbie pikseli zdjęcia z najmniejszą ich liczbą i 1 dla liczby pikseli zdjęcia z najwięskzą ich liczbą."""
+
+        normalized_val = (self.img.shape[0] * self.img.shape[1]) / (MAX_VAL - MIN_VAL)
+        transformed_val = MIN_TRANSFORMED + normalized_val * (MAX_TRANSFORMED - MIN_TRANSFORMED)
+
+        return transformed_val
+
+
     def fft_one_color_chanel(self, input_img: np.ndarray):
+
+        keep = 0.1
 
         Bt = np.fft.fft2(input_img)
         Btsort = np.sort(np.abs(Bt.reshape(-1)))
@@ -103,7 +124,7 @@ class Photo:
             thresh = mean
 
         if self.fft_type == 2:
-            x = 0
+            thresh = Btsort[int(np.floor((1-keep) * len(Btsort)))]
 
         ind = np.abs(Bt) > thresh
         Atlow = Bt * ind
@@ -122,18 +143,20 @@ class Photo:
 
         Csort = np.sort(np.abs(coeff_arr.reshape(-1)))
 
-        keep = 0.05
+        keep = 0.1
         thresh = Csort[int(np.floor((1 - keep) * len(Csort)))]
         ind = np.abs(coeff_arr) > thresh
         Cfilt = coeff_arr * ind
 
         coeffs_filt = pywt.array_to_coeffs(Cfilt, coeffs_slices, output_format = 'wavedec2')
-        img_decompressed = pywt.waverec2(coeffs_filt, wavelet = w).astype(np.uint8)
+        img_decompressed = pywt.waverec2(coeffs_filt, wavelet = w)
+        img_decompressed = np.clip(img_decompressed, 0, 255).astype(np.uint8)
         zeros = np.size(ind) - np.count_nonzero(ind)
 
         return img_decompressed, zeros
 
-    def fft(self):
+    def fft(self) -> None:
+        """"""
 
         img_components = [self.red, self.green, self.blue]
         c_img_components: list [np.ndarray] = []
@@ -150,7 +173,7 @@ class Photo:
         self.fft_d_blue = c_img_components[2]
         self.fft_decompressed_img = np.dstack(c_img_components)
         
-    def wavelet(self):
+    def wavelet(self) -> None:
 
         img_components = [self.red, self.green, self.blue]
         c_img_components: list [np.ndarray] = []
@@ -167,10 +190,11 @@ class Photo:
         self.wavelet_d_blue = c_img_components[2]
         self.wavelet_decompressed_img = np.dstack(c_img_components)
 
-    def mae(self):
+    def mae(self) -> None:
+        """Metoda oblicza wartośc MAE dla zdjęć po dekompresji i uzupełnia wartość dla odpowiednich atrybutów obiektu."""
 
         sum_val = 0
-        n = self.img.shape[0] * self.img.shape[1] * 3
+        n = self.img.shape[0] * self.img.shape[1] * 3   # liczba pikseli * 3 ze względu na 3 obrazy dla różnych kolorów
 
         for c in range(3):
             for i in range(self.img.shape[0]):
@@ -190,100 +214,18 @@ class Photo:
         
 
 if __name__ == "__main__":
-    # plt.rcParams["figure.figsize"] = [5, 5]
-    # plt.rcParams.update({"font.size": 18})
 
-
-    photo1 = Photo("panda.jpg", 1)
+    # photo1 = Photo("panda.jpg", 1)
+    # photo1 = Photo("circle.jpg", 2)
+    photo1 = Photo("mond.jpg", 2)
     photo1.show_img()
     photo1.show_img_components()
-    # photo1.fft()
     photo1.show_fft_decompressed_img()
     photo1.show_wavelet_decompressed_img()
-    # photo1.mae()
     print(photo1.fft_mae_val)
     print(photo1.fft_zero_val_coefs)
-
-
-    A =  imread(os.path.join("panda.jpg"))
-    # A =  imread(os.path.join("circle.jpg"))
-    # A =  imread(os.path.join("mond.jpg"))
-    A_r = A[:, :, 0]
-    A_g = A[:, :, 1]
-    A_b = A[:, :, 2]
-    A_components = [A_r, A_g, A_b]
-
-    # Fourier = True
-    Wavelet = True
-
-    # # # FFT
-
-    # if Fourier is True:
-
-    #     images_decompressed = []
-    #     images_compressed = []
-
-    #     plt.figure()
-    #     plt.subplot(3, 1, 1)
-    #     plt.imshow(A_r, cmap="gray")
-    #     plt.subplot(3, 1, 2)
-    #     plt.imshow(A_g, cmap="gray")
-    #     plt.subplot(3, 1, 3)
-    #     plt.imshow(A_b, cmap="gray")
-    #     plt.axis("off")
-        
-        
-        
-    #     # for keep in (0.1, 0.05, 0.01, 0.002):
-    #     for keep in (0.1, 0.2, 0.3, 0.4):
-    #         A_new  = []
-
-    #         for component in A_components:
-    #             Alow, zeros = fft_with_keeping(component, keep)
-    #             A_new.append(Alow)
-
-    #         A_new_2 = np.dstack(A_new)
-    #         # mae = mae(A, A_new_2)
-    #         images_decompressed.append(A_new_2)
-
-
-    #     for Alow in images_decompressed:
-    #         plt.figure()
-    #         plt.imshow(Alow, cmap="gray")
-    #         plt.axis("off")
-        
-            
-    #     plt.show()
-
-
-
-    # Wavelet
-
-    if Wavelet is True:
-
-        B = np.mean(A, -1)
-
-        n = 4
-        w = "db1"
-        coeffs = pywt.wavedec2(B, wavelet = w, level = n)
-        coeff_arr, coeffs_slices = pywt.coeffs_to_array(coeffs)
-
-        Csort = np.sort(np.abs(coeff_arr.reshape(-1)))
-
-        for keep in (0.1, 0.05, 0.01, 0.005):
-            thresh = Csort[int(np.floor((1 - keep) * len(Csort)))]
-            ind = np.abs(coeff_arr) > thresh
-            Cfilt = coeff_arr * ind
-
-            coeffs_filt = pywt.array_to_coeffs(Cfilt, coeffs_slices, output_format = 'wavedec2')
-            Arecon = pywt.waverec2(coeffs_filt, wavelet = w)
-            plt.figure()
-            plt.imshow(Arecon.astype(np.uint8), cmap="gray")
-            plt.axis("off")
-
-        plt.figure()
-        plt.imshow(B, cmap="gray")
-        plt.show()
+    print(photo1.wavelet_mae_val)
+    print(photo1.wavelet_zero_val_coefs)
 
 
 
