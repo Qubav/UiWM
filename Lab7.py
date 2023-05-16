@@ -5,26 +5,27 @@ import os
 import pywt
 
 
-KEEP_TOP_VAL = 0.1
-KEEP_BOTTOM_VAL = 0.5
-
 # zmienne globalne dla keep factor size
-MIN_VAL = 159600
-MAX_VAL = 490000
-MIN_TRANSFORMED = 0.8
-MAX_TRANSFORMED = 1
+MIN_VAL = 159600        # liczba pikseli w "najmniejszym" zdj
+MAX_VAL = 490000        # liczba pikseli w "największym" zdj
+MIN_TRANSFORMED = 0.06
+MAX_TRANSFORMED = 0.09
 
+# zmienne globalne dla keep factor zależnego od liczby apmplitu o wartości bezwzględnej więszkej niż 10% wartości największej apmlitudy
+AMP_MAX_VAL = 10
+AMP_MIN_VAL = 1
+AMP_MIN_TRANSFORMED = 0.9
+AMP_MAX_TRANSFORMED = 2.7
+
+# ścieżki zjęć
+PATHS = ["circle.jpg", "namib.jpg", "panda.jpg", "mond.jpg", "milky-way.jpg"] 
 
 class Photo:
-    """FFT różne sposoby na wybór thresh i wartość zmiennej fft_thresh_type dla nich:
-    1 - średnia wartość wartości bezwzględnych amplitud,
-    2 - """
 
-    def __init__(self, path: str, fft_thresh_type: int = 1) -> None:
+    def __init__(self, path: str) -> None:
 
         # atrybuty oryginalnego zdjęcia
         self.img = imread(os.path.join(path))
-        self.fft_type = fft_thresh_type
         self.red = self.img[:, :, 0]
         self.green = self.img[:, :, 1]
         self.blue = self.img[:, :, 2]
@@ -96,35 +97,40 @@ class Photo:
         plt.show()
 
     def keep_factor_size(self):
-        """Metoda zwraca wartość od 0.8 do 1 w zależności od rozmiarów zdjęcia. 0.8 przy liczbie pikseli zdjęcia z najmniejszą ich liczbą i 1 dla liczby pikseli zdjęcia z najwięskzą ich liczbą."""
+        """Metoda zwraca wartość od 0.06 do 0.09 w zależności od rozmiarów zdjęcia. 0.06 przy liczbie pikseli zdjęcia z najmniejszą ich liczbą i 0.09 dla liczby pikseli zdjęcia z najwięskzą ich liczbą."""
 
-        normalized_val = (self.img.shape[0] * self.img.shape[1]) / (MAX_VAL - MIN_VAL)
+        # normalizowanie wartości do przedziału 0 - 0.1
+        normalized_val = (self.img.shape[0] * self.img.shape[1] - MIN_VAL) / (MAX_VAL - MIN_VAL)
+        # skalowanie do wartości z przedziału 0.08 - 0.1
         transformed_val = MIN_TRANSFORMED + normalized_val * (MAX_TRANSFORMED - MIN_TRANSFORMED)
 
         return transformed_val
 
+    def keep_factor_amp(self, count: int):
+        """Metoda zwraca wartość od 0.9 do 2.7 w zależność od liczby amplitud o wartości bezwzględnej równej przynajmniej 10% wartości bezwzględnej najwyższej amplitudy. Jeśli ta liczba jest większa to zwracana jest wartość 3."""
+
+        if count > 10:
+            return 3
+        
+        # normalizowanie wartości do przedziału 0 - 1
+        normalized_val = (count - AMP_MIN_VAL) / (AMP_MAX_VAL - AMP_MIN_VAL)
+        # skalowanie do wartości z przedziału 0.9 - 2.7
+        transformed_val = AMP_MIN_TRANSFORMED + normalized_val * (AMP_MAX_TRANSFORMED - AMP_MIN_TRANSFORMED)
+
+        return transformed_val
 
     def fft_one_color_chanel(self, input_img: np.ndarray):
-
-        keep = 0.1
+        """Metoda wykonuje fft i zeruje część współczynników na podstawie wartości keep factor, a następnie wykonuje ifft."""
 
         Bt = np.fft.fft2(input_img)
         Btsort = np.sort(np.abs(Bt.reshape(-1)))
 
-        show = False
-        if show is True:
-            plt.figure()
-            plt.plot(Btsort)
-            plt.show()
-        
-        mean = np.mean(Btsort)
-
-        # różne sposoby na określenie wartości thresh
-        if self.fft_type == 1:
-            thresh = mean
-
-        if self.fft_type == 2:
-            thresh = Btsort[int(np.floor((1-keep) * len(Btsort)))]
+        # określenie jaki % współczynników pozostanie niewyzerowany
+        keep_factor_size = self.keep_factor_size()
+        count_val = np.count_nonzero(Btsort > Btsort[-1] * 0.1)
+        keep_factor_amp = self.keep_factor_amp(count_val)
+        keep = keep_factor_amp * keep_factor_size
+        thresh = Btsort[int(np.floor((1-keep) * len(Btsort)))]
 
         ind = np.abs(Bt) > thresh
         Atlow = Bt * ind
@@ -135,19 +141,23 @@ class Photo:
         return Alow, zeros
     
     def wavelet_one_color_chanel(self, input_img: np.ndarray):
+        """Metoda wykonuje transformatę falkową i zeruje część współczynników na podstawie wartości keep factor, a następnie wykonuje odwrotną transformatę falkową."""
 
         n = 4
         w = "db1"
         coeffs = pywt.wavedec2(input_img, wavelet = w, level = n)
         coeff_arr, coeffs_slices = pywt.coeffs_to_array(coeffs)
-
         Csort = np.sort(np.abs(coeff_arr.reshape(-1)))
 
-        keep = 0.1
+        # określenie jaki % współczynników pozostanie niewyzerowany
+        keep_factor_size = self.keep_factor_size()
+        count_val = np.count_nonzero(Csort > Csort[-1] * 0.1)
+        keep_factor_amp = self.keep_factor_amp(count_val)
+        keep = keep_factor_amp * keep_factor_size
         thresh = Csort[int(np.floor((1 - keep) * len(Csort)))]
+
         ind = np.abs(coeff_arr) > thresh
         Cfilt = coeff_arr * ind
-
         coeffs_filt = pywt.array_to_coeffs(Cfilt, coeffs_slices, output_format = 'wavedec2')
         img_decompressed = pywt.waverec2(coeffs_filt, wavelet = w)
         img_decompressed = np.clip(img_decompressed, 0, 255).astype(np.uint8)
@@ -156,7 +166,7 @@ class Photo:
         return img_decompressed, zeros
 
     def fft(self) -> None:
-        """"""
+        """Metoda wykonuje fft dla 3 barw, następnie łaczy uzyskane obrazy w 1 oraz oblicza wartość kryterium C."""
 
         img_components = [self.red, self.green, self.blue]
         c_img_components: list [np.ndarray] = []
@@ -174,6 +184,7 @@ class Photo:
         self.fft_decompressed_img = np.dstack(c_img_components)
         
     def wavelet(self) -> None:
+        """Metoda wykonuje transformatę falkową dla 3 barw, następnie łaczy uzyskane obrazy w 1 oraz oblicza wartość kryterium C."""
 
         img_components = [self.red, self.green, self.blue]
         c_img_components: list [np.ndarray] = []
@@ -215,20 +226,42 @@ class Photo:
 
 if __name__ == "__main__":
 
-    # photo1 = Photo("panda.jpg", 1)
-    # photo1 = Photo("circle.jpg", 2)
-    photo1 = Photo("mond.jpg", 2)
-    photo1.show_img()
-    photo1.show_img_components()
-    photo1.show_fft_decompressed_img()
-    photo1.show_wavelet_decompressed_img()
-    print(photo1.fft_mae_val)
-    print(photo1.fft_zero_val_coefs)
-    print(photo1.wavelet_mae_val)
-    print(photo1.wavelet_zero_val_coefs)
+    # dla pojedynczego zdjęcia
 
+    # photo1 = Photo("panda.jpg")
+    # photo1 = Photo("circle.jpg")
+    # photo1 = Photo("mond.jpg")
+    # photo1 = Photo("namib.jpg")
+    # photo1.show_img()
+    # photo1.show_img_components()
+    # photo1.show_fft_decompressed_img()
+    # photo1.show_wavelet_decompressed_img()
+    # print(photo1.fft_mae_val)
+    # print(photo1.fft_zero_val_coefs)
+    # print(photo1.wavelet_mae_val)
+    # print(photo1.wavelet_zero_val_coefs)
 
+    img_names = []
+    fft_mae_vals = []
+    fft_zero_counts = []
+    wave_mae_vals = []
+    wave_zero_counts = []
 
+    for path in PATHS:
+        photo1 = Photo(path)
+        photo1.show_img()
+        photo1.show_img_components()
+        photo1.show_fft_decompressed_img()
+        photo1.show_wavelet_decompressed_img()
+        img_names.append(path)
+        fft_mae_vals.append(photo1.fft_mae_val)
+        wave_mae_vals.append(photo1.wavelet_mae_val)
+        fft_zero_counts.append(photo1.fft_zero_val_coefs)
+        wave_zero_counts.append(photo1.wavelet_zero_val_coefs)
+
+    with open("Wartosci.txt", "w") as f:
+            for i in range(len(img_names)):
+                f.write(f"Zdjęcie: {img_names[i]}\nMAE fft: {fft_mae_vals[i]}\nMAE wavelet: {wave_mae_vals[i]}\nC fft: {fft_zero_counts[i]}\nC wavelet: {wave_zero_counts[i]}\n")
     
     
 
